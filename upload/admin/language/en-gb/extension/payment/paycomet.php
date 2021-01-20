@@ -19,6 +19,7 @@ $_['text_disabled'] = "Disabled";
 // Entry
 $_['entry_status']       = 'Status';
 $_['entry_client']       = 'Client Code';
+$_['entry_apikey']       = 'API Key';
 $_['entry_terminal']     = 'Terminal Number';
 $_['entry_password']     = 'Password';
 $_['entry_terminales']   = 'Terminals available';
@@ -46,6 +47,7 @@ $_['text_refund_issued'] = 'Refund was successfully issued';
 // Help
 
 $_['help_client']     		= 'PAYCOMET Client Code';
+$_['help_apikey']     		= 'PAYCOMET API Key';
 $_['help_terminal']     	= 'PAYCOMET Terminal Number';
 $_['help_password']     	= 'PAYCOMET Password';
 $_['help_tdfirst']     		= 'Use 3D Secure in first purchase';

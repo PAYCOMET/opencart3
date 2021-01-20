@@ -14,7 +14,6 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 
 
 		/* END ERRORS */
-		
 
 		if (($this->request->server['REQUEST_METHOD'] == 'POST') && $this->validate()) {
 			$this->model_setting_setting->editSetting('payment_paycomet', $this->request->post);
@@ -70,6 +69,18 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			$data['payment_paycomet_client'] = $this->request->post['payment_paycomet_client'];
 		} else {
 			$data['payment_paycomet_client'] = $this->config->get('payment_paycomet_client');
+		}
+
+		if (isset($this->request->post['payment_paycomet_apikey'])) {
+			$data['payment_paycomet_apikey'] = $this->request->post['payment_paycomet_apikey'];
+		} else {
+			$data['payment_paycomet_apikey'] = $this->config->get('payment_paycomet_apikey');
+		}
+
+		if (isset($this->request->post['payment_paycomet_apikey'])) {
+			$data['payment_paycomet_apikey'] = $this->request->post['payment_paycomet_apikey'];
+		} else {
+			$data['payment_paycomet_apikey'] = $this->config->get('payment_paycomet_apikey');
 		}
 
 		if (isset($this->request->post['payment_paycomet_terminal'])) {
@@ -363,7 +374,6 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		$this->load->language('extension/payment/paycomet');
 		$this->load->model('sale/order');
 
-
 		$json = array();
 
 		if (isset($this->request->post['order_id']) && isset($this->request->post['amount'])) {
@@ -394,7 +404,6 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 				}
 
 				if ($amount>0){
-
 	    			$currency_iso_code = $order_info['currency_code'];
 
 					$DS_MERCHANT_MERCHANTCODE = $this->config->get('payment_paycomet_client');
@@ -407,22 +416,44 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			        $DS_MERCHANT_MERCHANTSIGNATURE = hash('sha512', $DS_MERCHANT_MERCHANTCODE . $DS_IDUSER . $DS_TOKEN_USER . $DS_MERCHANT_TERMINAL . $DS_MERCHANT_AUTHCODE . $DS_MERCHANT_ORDER . $this->config->get('payment_paycomet_password'));
 			        $DS_ORIGINAL_IP = $_SERVER['REMOTE_ADDR'];
 					$DS_MERCHANT_AMOUNT = round($amount * 100);
+
+					if($this->config->get('payment_paycomet_apikey') != '')
+					{
+						include_once(DIR_APPLICATION . 'controller/extension/payment/PaycometApiRest.php');
+			
+						$apiRest = new PaycometApiRest($this->config->get('payment_paycomet_apikey'));
+
+						$executeRefundReponse = $apiRest->executeRefund(
+							$DS_MERCHANT_ORDER,
+							$DS_MERCHANT_TERMINAL,
+							$DS_MERCHANT_AMOUNT,
+							$DS_MERCHANT_CURRENCY,
+							$DS_MERCHANT_AUTHCODE,
+							$DS_ORIGINAL_IP
+						);
+
+						$result["DS_RESPONSE"] = ($executeRefundReponse->errorCode > 0) ? 0 : 1;
+						$result["DS_ERROR_ID"] = $executeRefundReponse->errorCode;
+						if ($executeRefundReponse->errorCode == 0) {
+							$result['DS_MERCHANT_AUTHCODE'] = $executeRefundReponse->authCode;
+						}
+
+					} else {
+						$result = $this->getClient()->execute_refund(
+							$DS_MERCHANT_MERCHANTCODE,
+							$DS_MERCHANT_TERMINAL,
+							$DS_IDUSER,
+							$DS_TOKEN_USER,
+							$DS_MERCHANT_AUTHCODE,
+							$DS_MERCHANT_ORDER,
+							$DS_MERCHANT_CURRENCY,
+							$DS_MERCHANT_MERCHANTSIGNATURE,
+							$DS_ORIGINAL_IP,
+							$DS_MERCHANT_AMOUNT
+						);
+					}
 					
-					$result = $this->getClient()->execute_refund(
-			            $DS_MERCHANT_MERCHANTCODE,
-			            $DS_MERCHANT_TERMINAL,
-			            $DS_IDUSER,
-			            $DS_TOKEN_USER,
-			            $DS_MERCHANT_AUTHCODE,
-			            $DS_MERCHANT_ORDER,
-			            $DS_MERCHANT_CURRENCY,
-			            $DS_MERCHANT_MERCHANTSIGNATURE,
-			            $DS_ORIGINAL_IP,
-			            $DS_MERCHANT_AMOUNT
-					);
-					
-					
-					if ($result[ 'DS_RESPONSE']==1){
+					if ($result[ 'DS_RESPONSE'] == 1){
 						$json['success'] = $this->language->get('text_refund_issued');
 						$total_refunded += $amount;
 
@@ -452,8 +483,6 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		$this->response->addHeader('Content-Type: application/json');
 		$this->response->setOutput(json_encode($json));
 	}
-
-	
 
 	public function orderAction() {
 		if ($this->config->get('payment_paycomet_status')) {
