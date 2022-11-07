@@ -222,13 +222,15 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 				// Check Signature
 				if ($sign!=$local_sign)	die('Error 1');
 
-				if($result == 1 && isset($this->request->post['IdUser']) && isset($this->request->post['TokenUser'])){
+				if($result == 1){
 
 					$this->model_checkout_order->addOrderHistory($order_id, $this->config->get('payment_paycomet_order_status_id'));
 					
 					if ($this->request->post['TransactionType']==1){
 						$data = array(
 							'Order'       	=> $this->request->post['Order'],
+							'MethodId'	 	=> $this->request->post['MethodId'],
+							'MethodName' 	=> $this->request->post['MethodName'],
 							'IdUser'       	=> $this->request->post['IdUser'],
 							'TokenUser' 	=> $this->request->post['TokenUser'],
 							'TransactionType'      => $this->request->post['TransactionType'],
