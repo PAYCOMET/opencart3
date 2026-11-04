@@ -1,6 +1,6 @@
 <?php
 
-class PaycometApiRest
+class Paycomet
 {
     private $apiKey;
 
@@ -105,7 +105,7 @@ class PaycometApiRest
             "payment" => [
                 'terminal'              => (int) $terminal,
                 'order'                 => (string) $order,
-                'amount'                => (string) $amount,
+                'amount'                => (int) $amount,
                 'currency'              => (string) $currency,
                 'methodId'              => (string) $methodId,
                 'originalIp'            => (string) $originalIp,
@@ -124,7 +124,7 @@ class PaycometApiRest
                 'notifyDirectPayment'   => (int) $notifyDirectPayment,
                 'merchantData'          => (array) $merchantData
             ]
-        ];
+        ];        
 
         return $this->executeRequest('/v1/payments', $params);
     }

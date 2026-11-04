@@ -1,8 +1,6 @@
 <?php
 class ControllerExtensionPaymentPaycomet extends Controller {
-	private $error = array();
-	public $url_paycomet = "https://api.paycomet.com/gateway/bnkgateway.php";
-	private $_client = null;
+	private $error = array();		
 
 	public function index() {
 
@@ -93,25 +91,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			$data['payment_paycomet_password'] = $this->request->post['payment_paycomet_password'];
 		} else {
 			$data['payment_paycomet_password'] = $this->config->get('payment_paycomet_password');
-		}
-
-		if (isset($this->request->post['payment_paycomet_terminales'])) {
-			$data['payment_paycomet_terminales'] = $this->request->post['payment_paycomet_terminales'];
-		} else {
-			$data['payment_paycomet_terminales'] = $this->config->get('payment_paycomet_terminales');
-		}
-
-		if (isset($this->request->post['payment_paycomet_tdfirst'])) {
-			$data['payment_paycomet_tdfirst'] = $this->request->post['payment_paycomet_tdfirst'];
-		} else {
-			$data['payment_paycomet_tdfirst'] = $this->config->get('payment_paycomet_tdfirst');
-		}
-
-		if (isset($this->request->post['payment_paycomet_tdmin'])) {
-			$data['payment_paycomet_tdmin'] = $this->request->post['payment_paycomet_tdmin'];
-		} else {
-			$data['payment_paycomet_tdmin'] = $this->config->get('payment_paycomet_tdmin');
-		}
+		}		
 
 		if (isset($this->request->post['payment_paycomet'])) {
 			$data['payment_paycomet'] = $this->request->post['payment_paycomet'];
@@ -134,17 +114,17 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		} else {
 			$data['payment_paycomet_sort_order'] = $this->config->get('payment_paycomet_sort_order');
 		}
-
-		if (isset($this->request->post['payment_paycomet_commerce_password'])) {
-			$data['payment_paycomet_commerce_password'] = $this->request->post['payment_paycomet_commerce_password'];
-		} else {
-			$data['payment_paycomet_commerce_password'] = $this->config->get('payment_paycomet_commerce_password');
-		}
-
+			
 		if (isset($this->error['client'])) {
 			$data['error_client'] = $this->error['client'];
 		} else {
 			$data['error_client'] = '';
+		}
+
+		if (isset($this->error['apikey'])) {
+			$data['error_apikey'] = $this->error['apikey'];
+		} else {
+			$data['error_apikey'] = '';
 		}
 
 		if (isset($this->error['terminal'])) {
@@ -157,12 +137,6 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			$data['error_password'] = $this->error['password'];
 		} else {
 			$data['error_password'] = '';
-		}
-
-		if (isset($this->error['tdmin'])) {
-			$data['error_tdmin'] = $this->error['tdmin'];
-		} else {
-			$data['error_tdmin'] = '';
 		}
 
 		$data['button_save'] = $this->language->get('button_save');
@@ -184,6 +158,10 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			$this->error['client'] = $this->language->get('error_client');
 		}
 
+		if (!$this->request->post['payment_paycomet_apikey']) {
+			$this->error['apikey'] = $this->language->get('error_apikey');
+		}
+
 		if (!$this->request->post['payment_paycomet_terminal']) {
 			$this->error['terminal'] = $this->language->get('error_terminal');
 		}
@@ -191,13 +169,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		if (!$this->request->post['payment_paycomet_password']) {
 			$this->error['password'] = $this->language->get('error_password');
 		}
-
-		if ($this->request->post['payment_paycomet_tdmin']) {
-			if (!is_numeric($this->request->post['payment_paycomet_tdmin']))
-			$this->error['tdmin'] = $this->language->get('error_tdmin');
-		}
-
-
+		
 		foreach ($errors as $error) {
 			if (isset($this->request->post[$this->name . '_' . $error]) && !$this->request->post[$this->name . '_' . $error]) {
 				$this->error[$error] = $this->language->get('error_' . $error);
@@ -247,7 +219,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 
 				$data['total'] = $paycomet_info['amount'];
 
-				$captured = number_format($this->model_extension_payment_paycomet->totalCaptured($this->request->get['order_id']), 2);
+				$captured = number_format($this->model_extension_payment_paycomet->totalCaptured($this->customer->getId(), $this->request->get['order_id']), 2);
 
 				$data['captured'] = $captured;
 
@@ -293,7 +265,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 						'amount'         => $result['amount'],
 						'date'           => $result['date'],
 						'type'           => "refund",
-						'type_text'           => $this->language->get('txt_refund'),
+						'type_text'      => $this->language->get('txt_refund'),
 						'refund'         => ""
 					);
 					$total_refunded += $result['amount'];
@@ -406,22 +378,20 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 				if ($amount>0){
 	    			$currency_iso_code = $order_info['currency_code'];
 
-					$DS_MERCHANT_MERCHANTCODE = $this->config->get('payment_paycomet_client');
 			        $DS_IDUSER = $paycomet_order_info["paycomet_iduser"];
 			        $DS_TOKEN_USER = $paycomet_order_info["paycomet_tokenuser"];
 			        $DS_MERCHANT_ORDER = trim($order_id);
 			        $DS_MERCHANT_CURRENCY = $currency_iso_code;
 			        $DS_MERCHANT_TERMINAL = $this->config->get('payment_paycomet_terminal');
-			        $DS_MERCHANT_AUTHCODE = $paycomet_order_info["authcode"];
-			        $DS_MERCHANT_MERCHANTSIGNATURE = hash('sha512', $DS_MERCHANT_MERCHANTCODE . $DS_IDUSER . $DS_TOKEN_USER . $DS_MERCHANT_TERMINAL . $DS_MERCHANT_AUTHCODE . $DS_MERCHANT_ORDER . $this->config->get('payment_paycomet_password'));
-			        $DS_ORIGINAL_IP = $_SERVER['REMOTE_ADDR'];
+			        $DS_MERCHANT_AUTHCODE = $paycomet_order_info["authcode"];			        
+			        $DS_ORIGINAL_IP = $this->request->server['REMOTE_ADDR'];
 					$DS_MERCHANT_AMOUNT = round($amount * 100);
 
 					if($this->config->get('payment_paycomet_apikey') != '')
 					{
-						include_once(DIR_APPLICATION . 'controller/extension/payment/PaycometApiRest.php');
+						include_once(DIR_SYSTEM . 'library/paycomet/paycomet.php');
 			
-						$apiRest = new PaycometApiRest($this->config->get('payment_paycomet_apikey'));
+						$apiRest = new Paycomet($this->config->get('payment_paycomet_apikey'));
 
 						$executeRefundReponse = $apiRest->executeRefund(
 							$DS_MERCHANT_ORDER,
@@ -437,20 +407,6 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 						if ($executeRefundReponse->errorCode == 0) {
 							$result['DS_MERCHANT_AUTHCODE'] = $executeRefundReponse->authCode;
 						}
-
-					} else {
-						$result = $this->getClient()->execute_refund(
-							$DS_MERCHANT_MERCHANTCODE,
-							$DS_MERCHANT_TERMINAL,
-							$DS_IDUSER,
-							$DS_TOKEN_USER,
-							$DS_MERCHANT_AUTHCODE,
-							$DS_MERCHANT_ORDER,
-							$DS_MERCHANT_CURRENCY,
-							$DS_MERCHANT_MERCHANTSIGNATURE,
-							$DS_ORIGINAL_IP,
-							$DS_MERCHANT_AMOUNT
-						);
 					}
 					
 					if ($result[ 'DS_RESPONSE'] == 1){
@@ -521,22 +477,5 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 
 			}
 		}
-	}
-
-	private function getClient()
-    {
-		// Para entornos de desarrollo con certificados propios
-		$context = stream_context_create(array(
-			'ssl' => array(
-				'verify_peer' => true,
-				'verify_peer_name' => false,
-				'allow_self_signed' => true
-			)
-		));
-
-        if (null == $this->_client)
-            $this->_client = new SoapClient('https://api.paycomet.com/gateway/xml_bankstore.php?wsdl', array('stream_context' => $context));
- 
-        return $this->_client;
-    }
+	}	
 }

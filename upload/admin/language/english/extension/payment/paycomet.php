@@ -33,6 +33,7 @@ $_['entry_stored_cards']        = 'Manage Stored Cards';
 // Error
 $_['error_permission']   	= 'Atention: No permission to modify PAYCOMET configuration!';
 $_['error_client']     		= 'Invalid Cliente Code!';
+$_['error_apikey']     		= 'Invalid API Key!';
 $_['error_password']     	= 'Invalid Password';
 $_['error_terminal']     	= 'Invalid Terminal';
 $_['error_tdmin']  			= 'Invalid Min value!';

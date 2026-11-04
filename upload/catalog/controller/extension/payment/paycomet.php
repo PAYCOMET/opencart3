@@ -2,21 +2,17 @@
 
 
 class ControllerExtensionPaymentPaycomet extends Controller {
-
-	public $url_paycomet = "https://api.paycomet.com/gateway/bnkgateway.php";
-	private $_client = null;
-
 	
 	public function index() {
 		$this->load->model('extension/payment/paycomet');
     	$this->load->language('extension/payment/paycomet');
 
-    	$data['paycomet_iframe'] = $this->paycomet_iframe_URL();
-
-    	$paycomet_client  = $this->config->get('payment_paycomet_client');
-    	$paycomet_terminal  = $this->config->get('payment_paycomet_terminal');
-    	$paycomet_password  = $this->config->get('payment_paycomet_password');
-    	$data['paycomet_commerce_password'] = $this->config->get('payment_paycomet_commerce_password');
+		try {
+	    	$data['paycomet_iframe'] = $this->paycomet_iframe_URL();
+		} catch (Exception $e) {
+			$this->session->data['error_warning'] = 'No se pudo completar la acción en el módulo.';
+			$data['error'] = $e->getMessage();
+		}
 
 		$data['months'] = array();
 
@@ -36,7 +32,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 				'text'  => strftime('%Y', mktime(0, 0, 0, 1, 1, $i)),
 				'value' => strftime('%Y', mktime(0, 0, 0, 1, 1, $i))
 			);
-		}
+		}		
 
 		$data['saved_cards'] = $this->model_extension_payment_paycomet->getCards($this->customer->getId());
 
@@ -47,7 +43,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		$data['show_savecard'] = ($customer_id>0)?1:0;
 
 		$this->model_extension_payment_paycomet->addOrderAgree($this->session->data['order_id'],$customer_id);
-		
+
         return $this->load->view('extension/payment/paycomet', $data);
 	}
 
@@ -58,15 +54,10 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		$order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
 
 		$amount = number_format($this->currency->format($order_info['total'], $order_info['currency_code'], false, false)*100,0, '.', '');
-		$paycomet_client  = $this->config->get('payment_paycomet_client');
+
 		$paycomet_apikey  = $this->config->get('payment_paycomet_apikey');
     	$paycomet_terminal  = $this->config->get('payment_paycomet_terminal');
-    	$paycomet_password  = $this->config->get('payment_paycomet_password');
 
-    	$paycomet_client  = $this->config->get('payment_paycomet_client');
-    	$paycomet_terminal  = $this->config->get('payment_paycomet_terminal');
-		$paycomet_password  = $this->config->get('payment_paycomet_password');
-		
 		$currency_iso_code = $order_info['currency_code'];
 		$language = $this->config->get('config_language');
 
@@ -74,17 +65,16 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		$URLOK = HTTPS_SERVER . 'index.php?route=extension/payment/paycomet/paymentreturn';
 
 		$paycomet_order_ref = $this->session->data['order_id'];
-
 		$importe  = number_format($amount/ 100, 2, ".","");
 
-		$secure_pay = $this->isSecureTransaction($importe,0)?1:0;
+		$secure_pay = 1;
 
 		$OPERATION = "1";
 
 		if($paycomet_apikey != '') {
-			include_once(DIR_APPLICATION . 'controller/extension/payment/PaycometApiRest.php');
+			include_once(DIR_SYSTEM . 'library/paycomet/paycomet.php');
 
-			$apiRest = new PaycometApiRest($paycomet_apikey);
+			$apiRest = new Paycomet($paycomet_apikey);
 
 			$userInteraction = 1;
 			$merchantData = $this->getMerchantData($order_info);
@@ -112,62 +102,19 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			if(isset($formResponse->challengeUrl)) {
 				$url_paycomet = $formResponse->challengeUrl;
 			} else {
-				var_dump("Se ha producido un error: " . $formResponse->errorCode);
-				die;
+				throw new Exception("Se ha producido un error: " . $formResponse->errorCode);
 			}
 
-		} else {
-			// Cálculo Firma
-			$signature = md5($paycomet_client.$paycomet_terminal.$OPERATION.$paycomet_order_ref.$amount.$currency_iso_code.md5($paycomet_password));
-			$fields = array
-			(
-				'MERCHANT_MERCHANTCODE' => $paycomet_client,
-				'MERCHANT_TERMINAL' => $paycomet_terminal,
-				'OPERATION' => $OPERATION,
-				'LANGUAGE' => $language,
-				'MERCHANT_MERCHANTSIGNATURE' => $signature,
-				'MERCHANT_ORDER' => $paycomet_order_ref,
-				'MERCHANT_AMOUNT' => $amount,
-				'MERCHANT_CURRENCY' => $currency_iso_code,
-				'URLOK' => $URLOK,
-				'URLKO' => $URLKO,
-				'3DSECURE' => $secure_pay
-			);
-			$query = http_build_query($fields);
-			
-			$url_paycomet = $this->url_paycomet . "?".$query;
 		}
-		
+
 		return $url_paycomet;
 	}
-
-	public function isSecureTransaction($importe,$card){
-		$terminales = $this->config->get('payment_paycomet_terminales');
-        $tdfirst = $this->config->get('payment_paycomet_tdfirst');
-        $tdmin = $this->config->get('payment_paycomet_tdmin');
-        // Transaccion Segura:
-        
-        // Si solo tiene Terminal Seguro
-        if ($terminales==0)
-            return true;   
-        // Si esta definido que el pago es 3d secure y no estamos usando una tarjeta tokenizada
-        if ($tdfirst && $card==0)
-            return true;
-        // Si se supera el importe maximo para compra segura
-        if ($terminales==2 && ($tdmin>0 && $tdmin < $importe))
-            return true;
-         // Si esta definido como que la primera compra es Segura y es la primera compra aunque este tokenizada
-        if ($terminales==2 && $tdfirst && $card>0 && $this->isFirstPurchaseToken($this->session->data['customer_id'],$card))
-            return true;
-        
-        return false;
-    }
 
     public function isFirstPurchaseToken($customer_id, $card){
     	$customer_id = $this->session->data['customer_id'];
     	$result = $this->db->query("SELECT * FROM " . DB_PREFIX . "paycomet_order WHERE id_customer = " . $customer_id . " AND paycomet_iduser = ". $card);
 		return ($result->num_rows>0)?false:true;
-		
+
     }
 
     public function saveOrderInfo(){
@@ -180,8 +127,8 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 
     	if ($this->session->data['customer_id']==$order_info["customer_id"]){
     		$this->load->model('extension/payment/paycomet');
-    		$this->model_extension_payment_paycomet->saveOrderInfo($this->customer->getId(),$order_id,$paycomet_agree);
-    	}   	
+    		$this->model_extension_payment_paycomet->saveOrderInfo($this->customer->getId(), $order_id, $paycomet_agree);
+    	}
     }
 
     public function paymentReturn(){
@@ -218,14 +165,14 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 	    		$pass  = $this->config->get('payment_paycomet_password');
 
 				$local_sign = md5($paycomet_client.$this->request->post['TpvID'].$this->request->post['TransactionType'].$order_id.$this->request->post['Amount'].$this->request->post['Currency'].md5($pass).$this->request->post['BankDateTime'].$this->request->post['Response']);
-				
+
 				// Check Signature
 				if ($sign!=$local_sign)	die('Error 1');
 
 				if($result == 1){
 
 					$this->model_checkout_order->addOrderHistory($order_id, $this->config->get('payment_paycomet_order_status_id'));
-					
+
 					if ($this->request->post['TransactionType']==1){
 						$data = array(
 							'Order'       	=> $this->request->post['Order'],
@@ -238,7 +185,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 							'Amount'      	=> $importe,
 							'Response'    	=> $result
 						);
-						
+
 						$this->model_extension_payment_paycomet->updateOrder($data);
 
 						$paycomet_order_info = $this->model_extension_payment_paycomet->getOrderInfo($order_id);
@@ -248,28 +195,23 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 						if ($saveCard && !empty($this->request->post['IdUser']) && !empty($this->request->post['TokenUser'])) {
 
 							if($apiKey != '') {
-								include_once(DIR_APPLICATION . 'controller/extension/payment/PaycometApiRest.php');
+								include_once(DIR_SYSTEM . 'library/paycomet/paycomet.php');
 
-								$apiRest = new PaycometApiRest($apiKey);
+								$apiRest = new Paycomet($apiKey);
 
 								$infoUserResponse = $apiRest->infoUser(
 									$this->request->post['IdUser'],
 									$this->request->post['TokenUser'],
 									$paycomet_terminal
 								);
-		
+
 								if ($infoUserResponse->errorCode == 0) {
-									$result['DS_MERCHANT_PAN'] = $infoUserResponse->pan;
-									$result['DS_CARD_BRAND'] = $infoUserResponse->cardBrand;
+									$arrData['DS_MERCHANT_PAN'] = $infoUserResponse->pan;
+									$arrData['DS_CARD_BRAND'] = $infoUserResponse->cardBrand;
+
+									$this->model_extension_payment_paycomet->addCard($this->request->post['IdUser'],$this->request->post['TokenUser'],$arrData['DS_MERCHANT_PAN'],$arrData['DS_CARD_BRAND'],"",$paycomet_order_info["id_customer"]);
 								}
-							} else {
-								$result = $this->infoUser($this->request->post['IdUser'],$this->request->post['TokenUser']);
 							}
-							
-							$order_info = $this->model_checkout_order->getOrder($order_id);
-
-
-							$this->model_extension_payment_paycomet->addCard($this->request->post['IdUser'],$this->request->post['TokenUser'],$result['DS_MERCHANT_PAN'],$result['DS_CARD_BRAND'],"",$order_info["customer_id"]);
 						}
 						print "Pedido procesado";
 					}else{
@@ -289,9 +231,9 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 				if ($sign!=$local_sign)	die('Error 2');
 
 				if($apiKey != '') {
-					include_once(DIR_APPLICATION . 'controller/extension/payment/PaycometApiRest.php');
+					include_once(DIR_SYSTEM . 'library/paycomet/paycomet.php');
 
-					$apiRest = new PaycometApiRest($apiKey);
+					$apiRest = new Paycomet($apiKey);
 
 					$infoUserResponse = $apiRest->infoUser(
 						$this->request->post['IdUser'],
@@ -303,15 +245,13 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 						$result['DS_MERCHANT_PAN'] = $infoUserResponse->pan;
 						$result['DS_CARD_BRAND'] = $infoUserResponse->cardBrand;
 					}
-				} else {
-					$result = $this->infoUser( $this->request->post['IdUser'],$this->request->post['TokenUser']);
 				}
-				
+
 				$this->model_extension_payment_paycomet->addCard($this->request->post['IdUser'],$this->request->post['TokenUser'],$result['DS_MERCHANT_PAN'],$result['DS_CARD_BRAND'],"",$this->request->post['Order']);
 
 				print "Add User procesado";
 			}
-		
+
 		}else{
 			print "Error. No Transaction. No Response";
 		}
@@ -320,9 +260,9 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 
 	public function validPassword($customer_id,$passwd){
 		$result = $this->db->query("SELECT * FROM " . DB_PREFIX . "customer WHERE customer_id = " . $customer_id . " AND (password = SHA1(CONCAT(salt, SHA1(CONCAT(salt, SHA1('" . $passwd . "'))))) OR password = '" . md5($passwd) . "') AND status = '1'");
-		
+
 		return ($result->num_rows>0)?true:false;
-		
+
 	}
 
 	public function directPay()
@@ -331,25 +271,15 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		$this->load->model('checkout/order');
 		$this->load->language('extension/payment/paycomet');
 
-		$card = $_POST["card"];
-		$commerce_password = (isset($_POST["commerce_password"]))?$_POST["commerce_password"]:"";
+		$card = $this->encryption->decrypt($this->config->get('config_encryption'), $_POST["card"]);		
 
 		$customer_id = $this->session->data['customer_id'];
 
 		$order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
-	
-
-		if ($this->config->get('payment_paycomet_commerce_password')){
-	        if (!$this->validPassword($customer_id,$commerce_password)){
-	        	$json['error'] = $this->language->get('err_commerce_password');
-	        	$this->response->addHeader('Content-Type: application/json');
-				$this->response->setOutput(json_encode($json));
-	        }
-	    }
 
 		if (isset($this->session->data['order_id']) && $card!=""){
 
-			$card_data = $this->model_extension_payment_paycomet->getCard($this->session->data['customer_id'],$card);
+			$card_data = $this->model_extension_payment_paycomet->getCard($this->session->data['customer_id'], $card);
 			// Si la tarjeta no está asociada al usuario->Error
 			if (empty($card_data)){
 				$json['error'] = $this->language->get('err_card_user');
@@ -359,97 +289,62 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 				$order_id = $this->session->data['order_id'];
 				$order_info = $this->model_checkout_order->getOrder($order_id);
 
-				$amount = number_format($this->currency->format($order_info['total'], $order_info['currency_code'], false, false)*100,0, '.', '');	
+				$amount = number_format($this->currency->format($order_info['total'], $order_info['currency_code'], false, false)*100,0, '.', '');
 
 				$importe  = number_format($amount/ 100, 2, ".","");
-				
-				$paycomet_client  = $this->config->get('payment_paycomet_client');
 				$paycomet_apikey  = $this->config->get('payment_paycomet_apikey');
 	    		$paycomet_terminal  = $this->config->get('payment_paycomet_terminal');
-	    		$paycomet_password  = $this->config->get('payment_paycomet_password');
 	    		$currency_iso_code = $order_info['currency_code'];
 
-	    		$secure_pay = $this->isSecureTransaction($importe,$card)?1:0;
+	    		$secure_pay = 1;
 
-	    		if ($secure_pay){
-					$language = $this->config->get('config_language');
+				if($paycomet_apikey != '') {
+					include_once(DIR_SYSTEM . 'library/paycomet/paycomet.php');
+					$apiRest = new Paycomet($paycomet_apikey);
 
-					$paycomet_order_ref = $this->session->data['order_id'];
-
+					$userInteraction = '1';
+					$methodId = '1';
+					$notifyDirectPayment = 1;
+					$merchantData = $this->getMerchantData($order_info);
 					$URLKO = HTTPS_SERVER . 'index.php?route=extension/payment/paycomet/paymenterror';
 					$URLOK = HTTPS_SERVER . 'index.php?route=extension/payment/paycomet/paymentreturn';
 
-	    			$OPERATION = "109"; //exec_purchase_token
-	    			// Cálculo Firma
-	    			$signature = md5($paycomet_client.$card_data['paycomet_iduser'].$card_data['paycomet_tokenuser'].$paycomet_terminal.$OPERATION.$paycomet_order_ref.$amount.$currency_iso_code.md5($paycomet_password));
-		
-					$fields = array
-					(
-						'MERCHANT_MERCHANTCODE' => $paycomet_client,
-						'MERCHANT_TERMINAL' => $paycomet_terminal,
-						'OPERATION' => $OPERATION,
-						'LANGUAGE' => $language,
-						'MERCHANT_MERCHANTSIGNATURE' => $signature,
-						'MERCHANT_ORDER' => $paycomet_order_ref,
-						'MERCHANT_AMOUNT' => $amount,
-						'MERCHANT_CURRENCY' => $currency_iso_code,
-						'IDUSER' => $card_data['paycomet_iduser'],
-						'TOKEN_USER' => $card_data['paycomet_tokenuser'],
-						'3DSECURE' => 1,
-						'URLOK' => $URLOK,
-						'URLKO' => $URLKO
+					$executePurchaseResponse = $apiRest->executePurchase(
+						$paycomet_terminal,
+						$order_id,
+						$importe,
+						$currency_iso_code,
+						$methodId,
+						$this->request->server['REMOTE_ADDR'],
+						$secure_pay,
+						$card_data["paycomet_iduser"],
+						$card_data['paycomet_tokenuser'],
+						$URLOK,
+						$URLKO,
+						'',
+						'',
+						'',
+						$userInteraction,
+						[],
+						'',
+						'',
+						$merchantData,
+						$notifyDirectPayment
 					);
 
-					$query = http_build_query($fields);
-					
-					$url_paycomet = $this->url_paycomet . "?".$query;
+					$charge = array();
+					$charge["DS_RESPONSE"] = ($executePurchaseResponse->errorCode > 0)? 0 : 1;
+					$charge['DS_ERROR_ID'] = $executePurchaseResponse->errorCode;
+					$charge['DS_MERCHANT_AUTHCODE'] = $executePurchaseResponse->authCode ?? '';
 
-					$json['ACSURL'] = $url_paycomet;
-	    		} else {
-					if($paycomet_apikey != '') {
-						include_once(DIR_APPLICATION . 'controller/extension/payment/PaycometApiRest.php');
+					if ($executePurchaseResponse->challengeUrl)	{
+						$json['redirect'] = $executePurchaseResponse->challengeUrl;
+						$this->response->addHeader('Content-Type: application/json');
+						$this->response->setOutput(json_encode($json));
+					} else if ( ( int ) $charge[ 'DS_RESPONSE' ] == 1 && $charge['DS_MERCHANT_AUTHCODE'] != '' ) {
 
-						$userInteraction = '1';
-						$methodId = '1';
-						$notifyDirectPayment = 1;
-						$merchantData = $this->getMerchantData($order_info);
-						$URLKO = HTTPS_SERVER . 'index.php?route=extension/payment/paycomet/paymenterror';
-						$URLOK = HTTPS_SERVER . 'index.php?route=extension/payment/paycomet/paymentreturn';
-
-						$executePurchaseResponse = $apiRest->executePurchase(
-							$paycomet_terminal,
-							$order_id,
-							$importe,
-							$currency_iso_code,
-							$methodId,
-							Tools::getRemoteAddr(),
-							$secure_pay,
-							$data["IDUSER"],
-							$data['TOKEN_USER'],
-							$URLOK,
-							$URLKO,
-							'',
-							'',
-							'',
-							$userInteraction,
-							[],
-							'',
-							'',
-							$merchantData,
-							$notifyDirectPayment
-						);
-
-						$charge = array();
-						$charge["DS_RESPONSE"] = ($executePurchaseResponse->errorCode > 0)? 0 : 1;
-						$charge['DS_ERROR_ID'] = $executePurchaseResponse->errorCode;
-					} else {
-						$charge = $this->executePurchase($card_data['paycomet_iduser'],$card_data['paycomet_tokenuser'],$paycomet_client,$paycomet_terminal,$paycomet_password,$currency_iso_code,$importe,$order_id);
-					}
-
-		    		if ( ( int ) $charge[ 'DS_RESPONSE' ] == 1 ) {
-
-		    			$this->model_checkout_order->addOrderHistory($order_id, $this->config->get('payment_paycomet_order_status_id'));
-		    			$OPERATION = "1";
+						$this->model_checkout_order->addOrderHistory($order_id, $this->config->get('payment_paycomet_order_status_id'));
+						$OPERATION = "1";
 
 						$data = array(
 							'Order'       	=> $order_id,
@@ -460,20 +355,20 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 							'Amount'      	=> $importe,
 							'Response'    	=> $charge['DS_RESPONSE']
 						);
-						
+
 						$this->model_extension_payment_paycomet->updateOrder($data);
 
 						$json['redirect']  = $this->url->link('checkout/success', '', 'SSL');
-						
-					}else{
 
+					} else {
 						$json['error']  = $this->language->get('err_error') . $charge['DS_ERROR_ID'];
-
-						$this->response->redirect($this->url->link('checkout/checkout', '', 'SSL'));
+						$this->response->addHeader('Content-Type: application/json');
+						$this->response->setOutput(json_encode($json));
 					}
 				}
+
 			}
-		
+
 		}else{
 			$json['redirect']  = $this->url->link('account/login', '', 'SSL');
 		}
@@ -511,7 +406,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		}
 
 		$billingCountry = $order['payment_country'] ? $this->isoCodeToNumber($this->model_localisation_country->getCountry($order['payment_country_id'])["iso_code_2"]) : '';
-		
+
 		// Billing info
 		$Merchant_EMV3DS["billing"]["billAddrCity"] = $order['payment_city'] ?? '';
 		$Merchant_EMV3DS["billing"]["billAddrCountry"] = $billingCountry;
@@ -521,7 +416,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		if($billingCountry != '') {
 			$Merchant_EMV3DS["billing"]["billAddrState"] = $order['payment_zone'] ?? '';
 		}
-		
+
 		$shippingCountry = $order['shipping_country'] ? $this->isoCodeToNumber($this->model_localisation_country->getCountry($order['shipping_country_id'])["iso_code_2"]) : '';
 
 		// Shipping info
@@ -541,7 +436,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 		$Merchant_EMV3DS["threeDSRequestorAuthenticationInfo"] = $this->threeDSRequestorAuthenticationInfo();
 
 		// Address Match
-		$Merchant_EMV3DS["addrMatch"] = $order['payment_city'] == $order['shipping_city'] && 
+		$Merchant_EMV3DS["addrMatch"] = $order['payment_city'] == $order['shipping_city'] &&
 										$order['payment_country'] == $order['shipping_country'] &&
 										$order['payment_address_1'] == $order['shipping_address_1'] ? "Y" : "N";
 
@@ -563,7 +458,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			$date_now = new DateTime("now");
 			$diff = $date_now->diff($registryDate);
 			$dias = $diff->days;
-			
+
 			if ($dias == 0) {
 				$acctInfoData["chAccAgeInd"] = "02";
 			} else if ($dias < 30) {
@@ -573,7 +468,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			} else {
 				$acctInfoData["chAccAgeInd"] = "05";
 			}
-			
+
 			if(isset($order['customer_id'])) {
 				$acctInfoData["nbPurchaseAccount"] = $this->getUserCompletedOrders($order['customer_id']);
 				$acctInfoData["txnActivityDay"] = $this->getUserTransactions($order['customer_id'],'1 day');
@@ -635,7 +530,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 			$productInfo = $this->model_catalog_product->getProduct($product['product_id']);
 
 			$productId = $product['product_id'];
-			$shoppingCartData[$productId]["sku"] = $productInfo['sku'];
+			$shoppingCartData[$productId]["sku"] = $productInfo['sku'] ?? $productId;
 			$shoppingCartData[$productId]["quantity"] = $product['quantity'];
 			$shoppingCartData[$productId]["unitPrice"] = $product['price'];
 			$shoppingCartData[$productId]["name"] = $product['name'];
@@ -686,7 +581,7 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 
         return $arrCode[$code];
 	}
-	
+
 	public function isoCodePhonePrefix($code)
 	{
 		try {
@@ -696,66 +591,5 @@ class ControllerExtensionPaymentPaycomet extends Controller {
 
 		return "";
 	}
-	
-	private function getClient()
-    {
-		// Para entornos de desarrollo con certificados propios
-		$context = stream_context_create(array(
-			'ssl' => array(
-				'verify_peer' => true,
-				'verify_peer_name' => false,
-				'allow_self_signed' => true
-			)
-		));
-
-        if (null == $this->_client)
-            $this->_client = new SoapClient('https://api.paycomet.com/gateway/xml_bankstore.php?wsdl', array('stream_context' => $context));
- 
-        return $this->_client;
-    }
-
-    private function infoUser($DS_IDUSER, $DS_TOKEN_USER)
-    {
-        $this->load->model('extension/payment/paycomet');
-
-        $DS_MERCHANT_MERCHANTCODE = $this->config->get('payment_paycomet_client');
-        $DS_MERCHANT_TERMINAL = $this->config->get('payment_paycomet_terminal');
-        $DS_MERCHANT_PASSWORD = $this->config->get('payment_paycomet_password');
-        $DS_MERCHANT_MERCHANTSIGNATURE = hash('sha512', $DS_MERCHANT_MERCHANTCODE . $DS_IDUSER . $DS_TOKEN_USER . $DS_MERCHANT_TERMINAL . $DS_MERCHANT_PASSWORD);
-        
-        return $this->getClient()->info_user(
-            $DS_MERCHANT_MERCHANTCODE, $DS_MERCHANT_TERMINAL, $DS_IDUSER, $DS_TOKEN_USER, $DS_MERCHANT_MERCHANTSIGNATURE, $_SERVER['REMOTE_ADDR']);
-    }
-
-
-    private function executePurchase($paycomet_iduser, $paycomet_tokenuser, $paycomet_client,$paycomet_terminal,$paycomet_password,$currency_iso_code,$importe,$orderid)
-    {
-        $DS_MERCHANT_MERCHANTCODE = $paycomet_client;
-        $DS_IDUSER = $paycomet_iduser;
-        $DS_TOKEN_USER = $paycomet_tokenuser;
-        $DS_MERCHANT_AMOUNT = round($importe * 100);
-        $DS_MERCHANT_ORDER = $orderid;
-        $DS_MERCHANT_CURRENCY = $currency_iso_code;
-        $DS_MERCHANT_TERMINAL = $paycomet_terminal;
-        $DS_MERCHANT_MERCHANTSIGNATURE = hash('sha512', $DS_MERCHANT_MERCHANTCODE . $DS_IDUSER . $DS_TOKEN_USER . $DS_MERCHANT_TERMINAL . $DS_MERCHANT_AMOUNT . $DS_MERCHANT_ORDER . $paycomet_password);
-        $DS_ORIGINAL_IP = $_SERVER['REMOTE_ADDR'];
-        $DS_MERCHANT_PRODUCTDESCRIPTION = $orderid;
-        $DS_MERCHANT_OWNER = '';
-
-        $DS_MERCHANT_OWNER = ''; /*@TODO: Set owner*/
-        return $this->getClient()->execute_purchase(
-            $DS_MERCHANT_MERCHANTCODE,
-            $DS_MERCHANT_TERMINAL,
-            $DS_IDUSER,
-            $DS_TOKEN_USER,
-            $DS_MERCHANT_AMOUNT,
-            $DS_MERCHANT_ORDER,
-            $DS_MERCHANT_CURRENCY,
-            $DS_MERCHANT_MERCHANTSIGNATURE,
-            $DS_ORIGINAL_IP,
-            $DS_MERCHANT_PRODUCTDESCRIPTION,
-            $DS_MERCHANT_OWNER
-        );
-    }
 
 }
