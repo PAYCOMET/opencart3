@@ -110,7 +110,11 @@ class ControllerExtensionCreditCardPaycomet extends Controller {
 		$data['back'] = $this->url->link('extension/credit_card/paycomet', '', true);
 		$data['add'] = $this->url->link('extension/credit_card/paycomet/addCard', '', true);
 
-		$data['txt_url_paycomet'] = $this->paycomet_iframe_URL();
+		try {
+			$data['txt_url_paycomet'] = $this->paycomet_iframe_URL();
+		} catch (Exception $e) {
+			$data['error'] = $e->getMessage();
+		}		
 
         $data['column_left'] = $this->load->controller('common/column_left');
         $data['column_right'] = $this->load->controller('common/column_right');
@@ -126,49 +130,57 @@ class ControllerExtensionCreditCardPaycomet extends Controller {
 	public function paycomet_iframe_URL(){
 		$this->load->model('extension/payment/paycomet');
 
-		$paycomet_client  = $this->config->get('payment_paycomet_client');
-    	$paycomet_terminal  = $this->config->get('payment_paycomet_terminal');
-    	$paycomet_password  = $this->config->get('payment_paycomet_password');
+		$paycomet_apikey  = $this->config->get('payment_paycomet_apikey');		
+    	$paycomet_terminal  = $this->config->get('payment_paycomet_terminal');    	
 
 		$language = $this->language->get('code');
 
 		$URLKO = $this->url->link('extension/credit_card/paycomet', '', true);
 		$URLOK = $this->url->link('extension/credit_card/paycomet', '', true);
 
-		$paycomet_order_ref = $this->customer->getId();
-
-		$OPERATION = "1";
+		$paycomet_order_ref = $this->customer->getId();		
 	
 		$operation = 107;
 
-		// Cálculo Firma
-		$signature = md5($paycomet_client.$paycomet_terminal.$operation.$paycomet_order_ref.md5($paycomet_password));
-		$fields = array
-		(
-			'MERCHANT_MERCHANTCODE' => $paycomet_client,
-			'MERCHANT_TERMINAL' => $paycomet_terminal,
-			'OPERATION' => $operation,
-			'LANGUAGE' => $language,
-			'MERCHANT_MERCHANTSIGNATURE' => $signature,
-			'MERCHANT_ORDER' => $paycomet_order_ref,
-			'URLOK' => $URLOK,
-		    'URLKO' => $URLKO,
-		    '3DSECURE' => 1
-		);
-		$query = http_build_query($fields);
+		if ($paycomet_apikey != '') {
+			include_once(DIR_SYSTEM . 'library/paycomet/paycomet.php');
 
-		$url_paycomet = $this->model_extension_payment_paycomet->gerUrlPAYCOMET() . "?".$query;
+			$apiRest = new Paycomet($paycomet_apikey);		
+			$payment =  [
+				'terminal' => (int) $paycomet_terminal,
+				'order' => (string) $paycomet_order_ref,				
+				'urlOk' => $URLOK,
+				'urlKo' => $URLKO
+			];
+
+			$formResponse = $apiRest->form(
+				$operation,
+				substr($language, 0, 2),
+				$paycomet_terminal,
+				'',
+				$payment
+			);
+
+			if(isset($formResponse->challengeUrl)) {
+				$url_paycomet = $formResponse->challengeUrl;
+			} else {
+				throw new Exception("Se ha producido un error: " . $formResponse->errorCode);				
+			}
+
+		}
+
 		return $url_paycomet;
 	}
 
 	public function delete() {
 		$this->load->language('extension/credit_card/paycomet');
 		$this->load->model('extension/payment/paycomet');
-
-		$card = $this->model_extension_payment_paycomet->getCard($this->customer->getId(),$this->request->get['card_id']);
+		
+		$card_id = $this->encryption->decrypt($this->config->get('config_encryption'), $this->request->get['card_id']);
+		$card = $this->model_extension_payment_paycomet->getCard($this->customer->getId(), $card_id);
 
 		if (!empty($card['paycomet_iduser'])) {
-			$this->model_extension_payment_paycomet->deleteCard($this->request->get['card_id']);
+			$this->model_extension_payment_paycomet->deleteCard($this->customer->getId(), $card_id);
 			$this->session->data['success'] = $this->language->get('text_success_card');
 		} else {
 			$this->session->data['error_warning'] = $this->language->get('text_fail_card');

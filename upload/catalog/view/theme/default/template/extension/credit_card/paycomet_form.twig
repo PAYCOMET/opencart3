@@ -13,6 +13,10 @@ $(document).ready(function() {
       $("#clockwait").show();
       $("#form_paycomet").submit();
   });
+  
+  if ($("#paycomet_error").html() != "") {
+      $("#storingStep").hide();
+  }
 
 });
 
@@ -20,7 +24,7 @@ function vincularTarjeta(){
     if ($("#savecard").is(':checked')){
         $('#savecard').attr("disabled", true);
         $('#close_vincular').show();
-        $('#nueva_tarjeta').show();
+        $('#nueva_tarjeta').show();       
     }else{
         alert(msg_accept);
     }
@@ -49,6 +53,7 @@ function close_vincularTarjeta(){
     {% endif %}
     <div id="content" class="{{ class }}">{{ content_top }}
       <h1>{{ heading_title }}</h1>
+      <span id="paycomet_error">{{ error }}</span>
       <div id="storingStep" class="box">
         <p>{{ text_streamline }}</p>
         <p>
@@ -62,8 +67,7 @@ function close_vincularTarjeta(){
           <a href="javascript:void(0);" onclick="close_vincularTarjeta();" title="{{ txt_cancel }}" class="button button-small btn btn-default" id="close_vincular" style="display:none">
             <span>{{ txt_cancel }}<i class="icon-chevron-right right"></i></span>
           </a>
-        </p>
-
+        </p>        
         <p class="payment_module paycomet_iframe" id="nueva_tarjeta" style="display:none">
           <iframe src="{{ txt_url_paycomet }}" name="paycomet" style="width: 670px; border-top-width: 0px; border-right-width: 0px; border-bottom-width: 0px; border-left-width: 0px; border-style: initial; border-color: initial; border-image: initial; height: 422px; " marginheight="0" marginwidth="0" scrolling="no"></iframe>
         </p>

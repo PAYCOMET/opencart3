@@ -19,6 +19,7 @@ $_['text_disabled'] = "Disabled";
 // Entry
 $_['entry_status']       = 'Status';
 $_['entry_client']       = 'Client Code';
+$_['entry_apikey']       = 'API Key';
 $_['entry_terminal']     = 'Terminal Number';
 $_['entry_password']     = 'Password';
 $_['entry_terminales']   = 'Terminals available';
@@ -32,6 +33,7 @@ $_['entry_stored_cards']        = 'Manage Stored Cards';
 // Error
 $_['error_permission']   	= 'Atention: No permission to modify PAYCOMET configuration!';
 $_['error_client']     		= 'Invalid Cliente Code!';
+$_['error_apikey']     		= 'Invalid API Key!';
 $_['error_password']     	= 'Invalid Password';
 $_['error_terminal']     	= 'Invalid Terminal';
 $_['error_tdmin']  			= 'Invalid Min value!';
@@ -46,6 +48,7 @@ $_['text_refund_issued'] = 'Refund was successfully issued';
 // Help
 
 $_['help_client']     		= 'PAYCOMET Client Code';
+$_['help_apikey']     		= 'PAYCOMET API Key';
 $_['help_terminal']     	= 'PAYCOMET Terminal Number';
 $_['help_password']     	= 'PAYCOMET Password';
 $_['help_tdfirst']     		= 'Use 3D Secure in first purchase';

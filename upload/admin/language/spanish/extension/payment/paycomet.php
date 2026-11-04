@@ -19,6 +19,7 @@ $_['text_disabled'] = "Deshabilitado";
 // Entry
 $_['entry_status']       = 'Estado';
 $_['entry_client']       = 'Código de Cliente';
+$_['entry_apikey']       = 'API Key';
 $_['entry_terminal']     = 'Número de Terminal';
 $_['entry_password']     = 'Contraseña';
 $_['entry_terminales']   = 'Terminales disponibles';
@@ -47,6 +48,7 @@ $_['text_refund_issued'] = 'La devolución se ha realizado con éxito';
 // Help
 
 $_['help_client']     		= 'PAYCOMET Código de Cliente';
+$_['help_apikey']     		= 'PAYCOMET API Key';
 $_['help_terminal']     	= 'PAYCOMET Número de Terminal';
 $_['help_password']     	= 'PAYCOMET Contraseña';
 $_['help_tdfirst']     		= 'Usar 3D Secure en compras superiroes a ';
