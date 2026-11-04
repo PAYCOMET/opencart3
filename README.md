@@ -1,7 +1,7 @@
 paycomet-for-opencart
 =====================
 
-Módulo de pago de PAYCOMET para OpenCart (v.2.3 - 3.x)
+Módulo de pago de PAYCOMET para OpenCart (v3.x)
 
 ## Instrucciones de Instalación
 

@@ -21,14 +21,6 @@
 
         {% if (saved_cards|length > 0) %}
         <div class="direct_pay_button">
-            {% if (paycomet_commerce_password) %}
-                <div class="form-group">
-                    <label for='commerce_password'>{{ text_commerce_password }}</label>
-                    <input type="password" autocomplete="false" class="form-control"
-                           name="commerce_password" id="commerce_password">
-                </div>
-            {% endif %}
-
             <div class="buttons">
                 <div class="pull-right">
                     <input type="button" value="{{ button_confirm }}" id="button-confirm" data-loading-text="{{ text_loading }}" class="btn btn-primary" />
@@ -39,17 +31,17 @@
     </form>
 </div>
 
-<div id="paycomet_iframe" style="{{ display_iframe }}">
-
-    <h6 style="{{ display_savecards }}">{{ text_streamline }}</h6>
-    <div class="checkbox" style="{{ display_savecards }}">
+<div id="paycomet_iframe" style="{{ display_iframe }}">    
+    <h6 style="{{ display_savecards }}" class="newcard">{{ text_streamline }}</h6>
+    <div class="checkbox newcard" style="{{ display_savecards }}">
         <label for="savecard" class="checkbox">
             <input type="checkbox" name="savecard" id="savecard" onChange="saveOrderInfoJQ({{ order_id }})" checked>{{ txt_remember }}
             <a id="open_conditions" class="open_conditions" href="#conditions">{{ txt_terms }}</a>.
         </label>
     </div>
-    <iframe id="paycomet_iframe2" src="{{ paycomet_iframe }}" name="paycomet" style="width: 670px; border-top-width: 0px; border-right-width: 0px; border-bottom-width: 0px; border-left-width: 0px; border-style: initial; border-color: initial; border-image: initial; height: 422px;" marginheight="0" marginwidth="0" scrolling="no"></iframe>
-
+    <span id="paycomet_error">{{ error }}</span>
+    <iframe id="paycomet_iframe2" src="{{ paycomet_iframe }}" class="newcard" name="paycomet" style="width: 670px; border-top-width: 0px; border-right-width: 0px; border-bottom-width: 0px; border-left-width: 0px; border-style: initial; border-color: initial; border-image: initial; height: 422px;" marginheight="0" marginwidth="0" scrolling="no"></iframe>
+    
 </div>
 
 <div id="conditions" class="modal" style="overflow:auto;display:none;">
@@ -145,17 +137,25 @@ $(document).ready(function() {
         }
       });
     });
+    
+  //  checkCard();
 
 });
 
 
 function checkCard(){
-  if ($("#card").val()>0){
+  $(".newcard").show();
+  if ($("#card").val() != "0"){
       $("#paycomet_iframe").hide();
       $(".direct_pay_button").show();
-  }else{
-    $("#paycomet_iframe").show();
-    $(".direct_pay_button").hide();
+  } else {
+    $("#paycomet_iframe").show();    
+    $(".direct_pay_button").hide();    
+    if ($("#paycomet_error").html() == "") {
+        $(".newcard").show();
+    } else {
+        $(".newcard").hide();
+    }
   }
 }
 
